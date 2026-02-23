@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import authRoutes from "./routes/authRoutes.js";
+import authMiddleware from "./middleware/authMiddleware.js";
 
 dotenv.config();
 
@@ -12,6 +13,13 @@ app.use(express.json());
 
 app.get("/", (req, res) => {
   res.send("Volunteer Platform API Running 🚀");
+});
+
+app.get("/protected", authMiddleware, (req, res) => {
+  res.json({
+    message: "Protected route accessed ✅",
+    user: req.user,
+  });
 });
 
 app.use("/auth", authRoutes);
