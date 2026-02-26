@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../services/api";
+import { logout } from "../services/auth";
+import { toast } from "react-toastify";
 
 export default function OrganizationDashboard() {
   const [event, setEvent] = useState({
@@ -13,18 +15,23 @@ export default function OrganizationDashboard() {
 
   const navigate = useNavigate();
 
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+  };
+
   useEffect(() => {
     fetchEvents();
   }, []);
 
   const fetchEvents = async () => {
-    const res = await API.get("/events");
+    const res = await API.get("/events/my-events");
     setEvents(res.data.events);
   };
 
   const createEvent = async () => {
     await API.post("/events/create", event);
-    alert("Event created");
+    toast.success("Event created successfully");
     fetchEvents();
   };
 
@@ -67,7 +74,7 @@ export default function OrganizationDashboard() {
       <h3>My Events</h3>
 
       {events.map((e) => (
-        <div key={e.id}>
+        <div key={e.id} className="card">
           <h4>{e.title}</h4>
           <p>{e.description}</p>
 

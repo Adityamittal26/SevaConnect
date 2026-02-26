@@ -44,6 +44,8 @@ export const createEvent = async (req, res) => {
 */
 export const getAllEvents = async (req, res) => {
   try {
+    const userId = req.user.id;
+
     const result = await pool.query(
       `SELECT
          events.id,
@@ -52,16 +54,23 @@ export const getAllEvents = async (req, res) => {
          events.volunteers_required,
          events.created_at,
          users.name AS organizer_name,
-         COUNT(applications.id) AS volunteers_joined
+         COUNT(applications.id) AS volunteers_joined,
+         BOOL_OR(applications.volunteer_id = $1) AS already_applied
        FROM events
        JOIN users ON events.organizer_id = users.id
        LEFT JOIN applications
          ON events.id = applications.event_id
        GROUP BY events.id, users.name
-       ORDER BY events.created_at DESC`
+       ORDER BY events.created_at DESC`,
+      [userId]
     );
 
-    res.json({ events: result.rows });
+    const events = result.rows.map(event => ({
+      ...event,
+      is_full: Number(event.volunteers_joined) >= Number(event.volunteers_required)
+    }));
+
+    res.json({ events });
 
   } catch (error) {
     console.error(error);
@@ -210,5 +219,41 @@ export const getAppliedEvents = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+/*
+  ORGANIZATION GET OWN EVENTS
+*/
+export const getMyEvents = async (req, res) => {
+  try {
+    const organizer_id = req.user.id;
+
+    const result = await pool.query(
+      `SELECT
+         events.id,
+         events.title,
+         events.description,
+         events.volunteers_required,
+         events.created_at,
+         COUNT(applications.id) AS volunteers_joined
+       FROM events
+       LEFT JOIN applications
+         ON events.id = applications.event_id
+       WHERE events.organizer_id = $1
+       GROUP BY events.id
+       ORDER BY events.created_at DESC`,
+      [organizer_id]
+    );
+
+    res.json({
+      events: result.rows,
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Server error",
+    });
   }
 };

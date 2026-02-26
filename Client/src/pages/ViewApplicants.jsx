@@ -24,7 +24,7 @@ export default function ViewApplicants() {
       )}
 
       {applicants.map((app) => (
-        <div key={app.id}>
+        <div key={app.id} className="card">
           <h4>{app.name}</h4>
           <p>{app.email}</p>
           <p>Applied at: {app.applied_at}</p>

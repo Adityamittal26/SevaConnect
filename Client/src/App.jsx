@@ -6,19 +6,35 @@ import VolunteerDashboard from "./pages/VolunteerDashboard";
 import OrganizationDashboard from "./pages/OrganizationDashboard";
 import AppliedEvents from "./pages/AppliedEvents";
 import ViewApplicants from "./pages/ViewApplicants";
+import Layout from "./components/Layout";
+import { Navigate } from "react-router-dom";
+
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Login />} />
+
+        {/* PUBLIC */}
+        <Route path="/" element={<Navigate to="/login" />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
-        <Route path="/volunteer" element={<VolunteerDashboard />} />
-        <Route path="/organization" element={<OrganizationDashboard />} />
-        <Route path="/applied" element={<AppliedEvents />} />
-        <Route path="/organization/event/:id" element={<ViewApplicants />} />
-        <Route path="/volunteer"element={<ProtectedRoute><VolunteerDashboard /> </ProtectedRoute>}/>
-        <Route path="/organization"element={<ProtectedRoute><OrganizationDashboard /> </ProtectedRoute>}/>
+
+        {/* VOLUNTEER */}
+        <Route element={<ProtectedRoute role="VOLUNTEER"><Layout /></ProtectedRoute>}>
+          <Route path="/volunteer" element={<VolunteerDashboard />} />
+          <Route path="/applied" element={<AppliedEvents />} />
+        </Route>
+
+        {/* ORGANIZATION */}
+        <Route element={<ProtectedRoute role="ORGANIZATION"><Layout /></ProtectedRoute>}>
+          <Route path="/organization" element={<OrganizationDashboard />} />
+          <Route path="/organization/event/:id" element={<ViewApplicants />} />
+        </Route>
+
+        {/* FALLBACK */}
+        <Route path="*" element={<Navigate to="/login" />} />
+
       </Routes>
     </BrowserRouter>
   );
