@@ -19,7 +19,7 @@ export default function VolunteerDashboard() {
   }, []);
 
   const fetchEvents = async () => {
-    const res = await API.get("/events");
+    const res = await API.get("/events?page=1&limit=10");
     setEvents(res.data.events);
   };
 

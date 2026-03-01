@@ -9,7 +9,6 @@ import ViewApplicants from "./pages/ViewApplicants";
 import Layout from "./components/Layout";
 import { Navigate } from "react-router-dom";
 
-
 function App() {
   return (
     <BrowserRouter>

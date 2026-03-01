@@ -2,6 +2,9 @@ import express from "express";
 import { createEvent,getAllEvents,applyToEvent,getEventApplicants,getAppliedEvents,getMyEvents } from "../controllers/eventController.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 import roleMiddleware from "../middleware/roleMiddleware.js";
+import { validate } from "../middleware/validate.js";
+import { createEventSchema } from "../validators/eventValidator.js";
+
 
 const router = express.Router();
 
@@ -9,6 +12,7 @@ router.post(
   "/create",
   authMiddleware,
   roleMiddleware("ORGANIZATION"),
+  validate(createEventSchema),
   createEvent
 );
 

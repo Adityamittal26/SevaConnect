@@ -5,6 +5,9 @@ import authRoutes from "./routes/authRoutes.js";
 import authMiddleware from "./middleware/authMiddleware.js";
 import roleMiddleware from "./middleware/roleMiddleware.js";
 import eventRoutes from "./routes/eventRoutes.js";
+import { apiLimiter } from "./middleware/rateLimiter.js";
+import  helmet  from "helmet";
+import { errorHandler } from "./middleware/errorHandler.js";
 
 dotenv.config();
 
@@ -13,6 +16,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use("/events", eventRoutes);
+app.use(apiLimiter);
+app.use(helmet());
+app.use(errorHandler);
+
 
 app.get("/", (req, res) => {
   res.send("Volunteer Platform API Running 🚀");

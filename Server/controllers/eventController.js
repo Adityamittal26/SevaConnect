@@ -1,20 +1,22 @@
 import pool from "../config/db.js";
+import { AppError } from "../utils/AppError.js";
+import { logger } from "../utils/logger.js";
 
 /*
   CREATE EVENT (Organization only)
 */
-export const createEvent = async (req, res) => {
+export const createEvent = async (req, res, next) => {
   try {
     const { title, description, volunteers_required } = req.body;
 
-    // validation
+    // validation safeguard (Zod already validates, but double safety)
     if (!title || !volunteers_required) {
-      return res.status(400).json({
-        message: "Title and volunteers_required are required",
-      });
+      throw new AppError(
+        "Title and volunteers_required are required",
+        400
+      );
     }
 
-    // logged-in organization id from JWT
     const organizer_id = req.user.id;
 
     const result = await pool.query(
@@ -30,21 +32,24 @@ export const createEvent = async (req, res) => {
       event: result.rows[0],
     });
 
+    logger.info(`Event created by user ${organizer_id}`);
+
   } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Server error",
-    });
+    next(error);
   }
 };
 
 
 /*
-  GET ALL EVENTS
+  GET ALL EVENTS (Paginated)
 */
-export const getAllEvents = async (req, res) => {
+export const getAllEvents = async (req, res, next) => {
   try {
     const userId = req.user.id;
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
 
     const result = await pool.query(
       `SELECT
@@ -61,33 +66,35 @@ export const getAllEvents = async (req, res) => {
        LEFT JOIN applications
          ON events.id = applications.event_id
        GROUP BY events.id, users.name
-       ORDER BY events.created_at DESC`,
-      [userId]
+       ORDER BY events.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [userId, limit, offset]
     );
 
     const events = result.rows.map(event => ({
       ...event,
-      is_full: Number(event.volunteers_joined) >= Number(event.volunteers_required)
+      is_full:
+        Number(event.volunteers_joined) >=
+        Number(event.volunteers_required),
     }));
 
-    res.json({ events });
+    res.json({ page, limit, events });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
+    next(error);
   }
 };
+
 
 /*
   VOLUNTEER APPLIES TO EVENT
 */
-export const applyToEvent = async (req, res) => {
+export const applyToEvent = async (req, res, next) => {
   try {
     const { eventId } = req.params;
-
     const volunteer_id = req.user.id;
 
-    // prevent duplicate applications
+    // duplicate check
     const existing = await pool.query(
       `SELECT * FROM applications
        WHERE event_id = $1 AND volunteer_id = $2`,
@@ -95,38 +102,37 @@ export const applyToEvent = async (req, res) => {
     );
 
     if (existing.rows.length > 0) {
-      return res.status(400).json({
-        message: "Already applied to this event",
-      });
+      throw new AppError(
+        "Already applied to this event",
+        400
+      );
     }
 
-    // check volunteer limit
-const countResult = await pool.query(
-  `SELECT
-     events.volunteers_required,
-     COUNT(applications.id) AS current_count
-   FROM events
-   LEFT JOIN applications
-     ON events.id = applications.event_id
-   WHERE events.id = $1
-   GROUP BY events.id`,
-  [eventId]
-);
+    // check event + limit
+    const countResult = await pool.query(
+      `SELECT
+         events.volunteers_required,
+         COUNT(applications.id) AS current_count
+       FROM events
+       LEFT JOIN applications
+         ON events.id = applications.event_id
+       WHERE events.id = $1
+       GROUP BY events.id`,
+      [eventId]
+    );
 
-if (countResult.rows.length === 0) {
-  return res.status(404).json({
-    message: "Event not found",
-  });
-}
+    if (countResult.rows.length === 0) {
+      throw new AppError("Event not found", 404);
+    }
 
-const event = countResult.rows[0];
+    const event = countResult.rows[0];
 
-// block if limit reached
-if (event.current_count >= event.volunteers_required) {
-  return res.status(400).json({
-    message: "Volunteer limit reached",
-  });
-}
+    if (event.current_count >= event.volunteers_required) {
+      throw new AppError(
+        "Volunteer limit reached",
+        400
+      );
+    }
 
     const result = await pool.query(
       `INSERT INTO applications (event_id, volunteer_id)
@@ -140,31 +146,31 @@ if (event.current_count >= event.volunteers_required) {
       application: result.rows[0],
     });
 
+    logger.info(`User ${volunteer_id} applied to event ${eventId}`);
+
   } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Server error",
-    });
+    next(error);
   }
 };
 
+
 /*
-  ORGANIZATION VIEWS APPLICANTS FOR AN EVENT
+  ORGANIZATION VIEWS APPLICANTS
 */
-export const getEventApplicants = async (req, res) => {
+export const getEventApplicants = async (req, res, next) => {
   try {
     const { eventId } = req.params;
 
-    // ensure event belongs to this organization
     const eventCheck = await pool.query(
       "SELECT * FROM events WHERE id = $1 AND organizer_id = $2",
       [eventId, req.user.id]
     );
 
     if (eventCheck.rows.length === 0) {
-      return res.status(403).json({
-        message: "You are not allowed to view applicants for this event",
-      });
+      throw new AppError(
+        "You are not allowed to view applicants for this event",
+        403
+      );
     }
 
     const result = await pool.query(
@@ -179,22 +185,18 @@ export const getEventApplicants = async (req, res) => {
       [eventId]
     );
 
-    res.json({
-      applicants: result.rows,
-    });
+    res.json({ applicants: result.rows });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Server error",
-    });
+    next(error);
   }
 };
+
 
 /*
   VOLUNTEER VIEW APPLIED EVENTS
 */
-export const getAppliedEvents = async (req, res) => {
+export const getAppliedEvents = async (req, res, next) => {
   try {
     const volunteer_id = req.user.id;
 
@@ -212,20 +214,18 @@ export const getAppliedEvents = async (req, res) => {
       [volunteer_id]
     );
 
-    res.json({
-      applied_events: result.rows,
-    });
+    res.json({ applied_events: result.rows });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
+    next(error);
   }
 };
+
 
 /*
   ORGANIZATION GET OWN EVENTS
 */
-export const getMyEvents = async (req, res) => {
+export const getMyEvents = async (req, res, next) => {
   try {
     const organizer_id = req.user.id;
 
@@ -246,14 +246,9 @@ export const getMyEvents = async (req, res) => {
       [organizer_id]
     );
 
-    res.json({
-      events: result.rows,
-    });
+    res.json({ events: result.rows });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Server error",
-    });
+    next(error);
   }
 };

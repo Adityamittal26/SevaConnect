@@ -2,6 +2,8 @@ import { useState } from "react";
 import API from "../services/api";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
+import { toast } from "react-toastify";
+
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -41,7 +43,7 @@ export default function Login() {
       }
 
     } catch (err) {
-      alert("Login failed");
+      toast("Login failed!");
     }
   };
 

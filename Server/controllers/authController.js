@@ -1,37 +1,35 @@
 import pool from "../config/db.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { AppError } from "../utils/AppError.js";
+import { logger } from "../utils/logger.js";
 
 /*
   SIGNUP CONTROLLER
 */
-export const signup = async (req, res) => {
+export const signup = async (req, res, next) => {
   try {
     const { name, email, password, role } = req.body;
 
-    // 1️⃣ Basic validation
+    // validation safeguard (Zod already validates)
     if (!name || !email || !password || !role) {
-      return res.status(400).json({
-        message: "All fields are required",
-      });
+      throw new AppError("All fields are required", 400);
     }
 
-    // 2️⃣ Check if user already exists
+    // check if user already exists
     const existingUser = await pool.query(
       "SELECT * FROM users WHERE email = $1",
       [email]
     );
 
     if (existingUser.rows.length > 0) {
-      return res.status(400).json({
-        message: "User already exists",
-      });
+      throw new AppError("User already exists", 400);
     }
 
-    // 3️⃣ Hash password
+    // hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 4️⃣ Insert user into database
+    // insert user
     const newUser = await pool.query(
       `INSERT INTO users (name, email, password_hash, role)
        VALUES ($1, $2, $3, $4)
@@ -39,32 +37,28 @@ export const signup = async (req, res) => {
       [name, email, hashedPassword, role]
     );
 
-    // 5️⃣ Send success response
     res.status(201).json({
       message: "User registered successfully",
       user: newUser.rows[0],
     });
 
+    logger.info(`New user registered: ${email}`);
+
   } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Server error",
-    });
+    next(error);
   }
 };
 
 
 /*
-  LOGIN CONTROLLER 
+  LOGIN CONTROLLER
 */
-export const login = async (req, res) => {
+export const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({
-        message: "Email and password required",
-      });
+      throw new AppError("Email and password required", 400);
     }
 
     const result = await pool.query(
@@ -73,9 +67,8 @@ export const login = async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(400).json({
-        message: "Invalid credentials",
-      });
+      // do NOT reveal whether email exists (security best practice)
+      throw new AppError("Invalid credentials", 400);
     }
 
     const user = result.rows[0];
@@ -86,9 +79,7 @@ export const login = async (req, res) => {
     );
 
     if (!isMatch) {
-      return res.status(400).json({
-        message: "Invalid credentials",
-      });
+      throw new AppError("Invalid credentials", 400);
     }
 
     const token = jwt.sign(
@@ -110,10 +101,9 @@ export const login = async (req, res) => {
       },
     });
 
+    logger.info(`User logged in: ${email}`);
+
   } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Server error",
-    });
+    next(error);
   }
 };

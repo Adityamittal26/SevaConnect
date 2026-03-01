@@ -2,6 +2,7 @@ import { useState } from "react";
 import API from "../services/api";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
+import { toast } from "react-toastify";
 
 export default function Signup() {
   const [form, setForm] = useState({
@@ -27,11 +28,22 @@ export default function Signup() {
   }
 }, [navigate]);
 
-  const handleSignup = async () => {
+ const handleSignup = async () => {
+  try {
     await API.post("/auth/signup", form);
-    alert("Signup successful");
+
+    toast.success("Signup successful");
     navigate("/");
-  };
+  } catch (error) {
+    console.log(error);
+
+    // show backend error if available
+    const message =
+      error.response?.data?.message || "Signup failed. Please try again.";
+
+    toast.error("Signup failed!");
+  }
+};
 
   return (
     <div>
