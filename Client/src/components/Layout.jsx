@@ -4,7 +4,7 @@ export default function Layout() {
   const navigate = useNavigate();
 
   const logout = () => {
-    localStorage.removeItem("token");
+    localStorage.removeItem("accessToken");
     localStorage.removeItem("role");
     navigate("/");
   };

@@ -1,8 +1,8 @@
 export const getToken = () => {
-  return localStorage.getItem("token");
+  return localStorage.getItem("accessToken");
 };
 
 export const logout = () => {
-  localStorage.removeItem("token");
-  localStorage.removeItem("role");
+  localStorage.clear();
+  
 };

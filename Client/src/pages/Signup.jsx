@@ -15,7 +15,7 @@ export default function Signup() {
   const navigate = useNavigate();
 
  useEffect(() => {
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("accessToken");
   const role = localStorage.getItem("role");
 
   // only redirect if already logged in

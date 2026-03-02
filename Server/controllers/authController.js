@@ -67,7 +67,6 @@ export const login = async (req, res, next) => {
     );
 
     if (result.rows.length === 0) {
-      // do NOT reveal whether email exists (security best practice)
       throw new AppError("Invalid credentials", 400);
     }
 
@@ -82,18 +81,31 @@ export const login = async (req, res, next) => {
       throw new AppError("Invalid credentials", 400);
     }
 
-    const token = jwt.sign(
-      {
-        id: user.id,
-        role: user.role,
-      },
+    // 🔐 Short-lived Access Token
+    const accessToken = jwt.sign(
+      { id: user.id, role: user.role },
       process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    // 🔄 Long-lived Refresh Token
+    const refreshToken = jwt.sign(
+      { id: user.id },
+      process.env.JWT_REFRESH_SECRET,
       { expiresIn: "7d" }
     );
 
+    // Store refresh token in DB
+    await pool.query(
+      "UPDATE users SET refresh_token = $1 WHERE id = $2",
+      [refreshToken, user.id]
+    );
+
+    logger.info(`User logged in: ${email}`);
+
     res.json({
-      message: "Login successful",
-      token,
+      accessToken,
+      refreshToken,
       user: {
         id: user.id,
         name: user.name,
@@ -101,7 +113,65 @@ export const login = async (req, res, next) => {
       },
     });
 
-    logger.info(`User logged in: ${email}`);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const refreshToken = async (req, res, next) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      throw new AppError("Refresh token required", 401);
+    }
+
+    let decoded;
+
+    try {
+      decoded = jwt.verify(
+        refreshToken,
+        process.env.JWT_REFRESH_SECRET
+      );
+    } catch (err) {
+      throw new AppError("Refresh token expired", 403);
+    }
+
+    const result = await pool.query(
+      "SELECT * FROM users WHERE id = $1",
+      [decoded.id]
+    );
+
+    if (
+      result.rows.length === 0 ||
+      result.rows[0].refresh_token !== refreshToken
+    ) {
+      throw new AppError("Invalid refresh token", 403);
+    }
+
+    const newAccessToken = jwt.sign(
+      { id: decoded.id, role: result.rows[0].role },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    res.json({ accessToken: newAccessToken });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const logout = async (req, res, next) => {
+  try {
+    const { userId } = req.body;
+
+    await pool.query(
+      "UPDATE users SET refresh_token = NULL WHERE id = $1",
+      [userId]
+    );
+
+    res.json({ message: "Logged out successfully" });
 
   } catch (error) {
     next(error);

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import API from "../services/api";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { toast } from "react-toastify";
 
@@ -10,20 +10,21 @@ export default function Login() {
   const [password, setPassword] = useState("");
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
-  const token = localStorage.getItem("token");
-  const role = localStorage.getItem("role");
+    const token = localStorage.getItem("accessToken");
+    const role = localStorage.getItem("role");
 
-  // only redirect if already logged in
-  if (!token) return;
+    // only redirect if already logged in
+    if (!token) return;
 
-  if (role === "VOLUNTEER") {
-    navigate("/volunteer", { replace: true });
-  } else if (role === "ORGANIZATION") {
-    navigate("/organization", { replace: true });
-  }
-}, [navigate]);
+    if (role === "VOLUNTEER") {
+      navigate("/volunteer", { replace: true });
+    } else if (role === "ORGANIZATION") {
+      navigate("/organization", { replace: true });
+    }
+  }, [navigate]);
 
   const handleLogin = async () => {
     try {
@@ -32,8 +33,11 @@ export default function Login() {
         password,
       });
 
-      localStorage.setItem("token", res.data.token);
+      localStorage.setItem("accessToken", res.data.accessToken);
+      localStorage.setItem("refreshToken", res.data.refreshToken);
       localStorage.setItem("role", res.data.user.role);
+
+      toast("Login successful!");
 
       // redirect based on role
       if (res.data.user.role === "VOLUNTEER") {
@@ -46,6 +50,17 @@ export default function Login() {
       toast("Login failed!");
     }
   };
+
+  useEffect(() => {
+  const params = new URLSearchParams(location.search);
+
+  if (params.get("session") === "expired") {
+    toast.warning("Session expired. Please login again.");
+
+    // optional: remove query from URL after showing message
+    navigate("/login", { replace: true });
+  }
+}, [location, navigate]);
 
   return (
     <div>

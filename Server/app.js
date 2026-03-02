@@ -8,6 +8,7 @@ import eventRoutes from "./routes/eventRoutes.js";
 import { apiLimiter } from "./middleware/rateLimiter.js";
 import  helmet  from "helmet";
 import { errorHandler } from "./middleware/errorHandler.js";
+import healthRoutes from "./routes/healthRoutes.js";
 
 dotenv.config();
 
@@ -18,6 +19,10 @@ app.use(express.json());
 app.use("/events", eventRoutes);
 app.use(apiLimiter);
 app.use(helmet());
+app.use("/auth", authRoutes);
+
+app.use("/health", healthRoutes);
+
 app.use(errorHandler);
 
 
@@ -43,8 +48,6 @@ app.get(
     });
   }
 );
-
-app.use("/auth", authRoutes);
 
 const PORT = process.env.PORT || 5000;
 
